@@ -142,13 +142,13 @@ def long2bytes(n):
         return b''.join([chr(c) for c in s])
 
 
-def sha1(*args):
-    sha1 = hashlib.sha1()
+def hash_digest(hash_algo, *args):
+    algo = hash_algo()
     for v in args:
         if not isinstance(v, bytes):
             v = long2bytes(v)
-        sha1.update(v)
-    return sha1.digest()
+        algo.update(v)
+    return algo.digest()
 
 
 def pad(n):
@@ -165,14 +165,14 @@ def pad(n):
 
 
 def get_scramble(x, y):
-    return bytes2long(sha1(pad(x), pad(y)))
+    return bytes2long(hash_digest(hashlib.sha1, pad(x), pad(y)))
 
 
 def getUserHash(salt, user, password):
     assert isinstance(user, bytes)
     assert isinstance(password, bytes)
-    hash1 = sha1(user, b':', password)
-    hash2 = sha1(salt, hash1)
+    hash1 = hash_digest(hashlib.sha1, user, b':', password)
+    hash2 = hash_digest(hashlib.sha1, salt, hash1)
     rc = bytes2long(hash2)
 
     return rc
@@ -237,7 +237,7 @@ def client_session(user, password, salt, A, B, a):
     ux = (u * x) % N
     aux = (a + ux) % N
     session_secret = pow(diff, aux, N)      # (B - kg^x) ^ (a + ux)
-    K = sha1(session_secret)
+    K = hash_digest(hashlib.sha1, session_secret)
 
     return K
 
@@ -256,7 +256,7 @@ def server_session(user, password, salt, A, B, b):
     vu = pow(v, u, N)                       # v^u
     Avu = (A * vu) % N                      # Av^u
     session_secret = pow(Avu, b, N)         # (Av^u) ^ b
-    K = sha1(session_secret)
+    K = hash_digest(hashlib.sha1, session_secret)
     if DEBUG_PRINT:
         print('server session_secret=', binascii.b2a_hex(long2bytes(session_secret)), end='\n')
         print('server session hash K=', binascii.b2a_hex(K))
@@ -271,9 +271,12 @@ def client_proof(user, password, salt, A, B, a):
     N, g, k = get_prime()
     K = client_session(user, password, salt, A, B, a)
 
-    n1 = bytes2long(sha1(N))
-    n2 = bytes2long(sha1(g))
-    M = sha1(pow(n1, n2, N), sha1(user), salt, A, B, K)
+    n1 = bytes2long(hash_digest(hashlib.sha1, N))
+    n2 = bytes2long(hash_digest(hashlib.sha1, g))
+    M = hash_digest(
+        hashlib.sha1,
+        pow(n1, n2, N), hash_digest(hashlib.sha1, user), salt, A, B, K
+    )
     if DEBUG_PRINT:
         print('client_proof:M=', binascii.b2a_hex(M), end='\n')
         print('client_proof:K=', binascii.b2a_hex(K), end='\n')
