@@ -209,7 +209,7 @@ def server_seed(v):
     kv = (k * v) % N
     B = (kv + gb) % N
     if DEBUG_PRINT:
-        print("v", v, end='\n')
+        print("v", binascii.b2a_hex(long2bytes(v)), end='\n')
         print('b=', binascii.b2a_hex(long2bytes(b)), end='\n')
         print("gb", binascii.b2a_hex(long2bytes(gb)), end='\n')
         print("k", binascii.b2a_hex(long2bytes(k)), end='\n')
