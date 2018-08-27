@@ -54,8 +54,8 @@ class DisconnectByPeer(Warning):
 
 
 class InternalError(DatabaseError):
-    def __init__(self, message):
-        DatabaseError.__init__(self, message)
+    def __init__(self):
+        DatabaseError.__init__(self, 'InternalError')
 
 
 class OperationalError(DatabaseError):
