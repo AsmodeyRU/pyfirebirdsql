@@ -184,11 +184,11 @@ def client_seed():
         a: Client private key
     """
     N, g, k = get_prime()
-    a = random.randrange(0, 1 << SRP_KEY_SIZE)
-    A = pow(g, a, N)
     if DEBUG:
         a = DEBUG_PRIVATE_KEY
-        A = pow(g, a, N)
+    else:
+        a = random.randrange(0, 1 << SRP_KEY_SIZE)
+    A = pow(g, a, N)
     if DEBUG_PRINT:
         print('A=', binascii.b2a_hex(long2bytes(A)), end='\n')
         print('a=', binascii.b2a_hex(long2bytes(a)), end='\n')
@@ -201,20 +201,18 @@ def server_seed(v):
         b: Server private key
     """
     N, g, k = get_prime()
-    b = random.randrange(0, 1 << SRP_KEY_SIZE)
+    if DEBUG:
+        b = DEBUG_PRIVATE_KEY
+    else:
+        b = random.randrange(0, 1 << SRP_KEY_SIZE)
     gb = pow(g, b, N)
     kv = (k * v) % N
     B = (kv + gb) % N
-    if DEBUG:
-        b = DEBUG_PRIVATE_KEY
-        gb = pow(g, b, N)
-        kv = (k * v) % N
-        B = (kv + gb) % N
     if DEBUG_PRINT:
         print("v", v, end='\n')
         print('b=', binascii.b2a_hex(long2bytes(b)), end='\n')
-        print("gb", gb, end='\n')
-        print("kv", kv, end='\n')
+        print("gb", binascii.b2a_hex(long2bytes(gb)), end='\n')
+        print("kv", binascii.b2a_hex(long2bytes(kv)), end='\n')
         print('B=', binascii.b2a_hex(long2bytes(B)), end='\n')
     return B, b
 
@@ -286,7 +284,7 @@ def client_proof(user, password, salt, A, B, a, hash_algo):
 
 def get_salt():
     if DEBUG:
-        salt = b'\00' * SRP_SALT_SIZE
+        salt = binascii.unhexlify('02E268803000000079A478A700000002D1A6979000000026E1601C000000054F')
     else:
         if PYTHON_MAJOR_VER == 3:
             salt = bytes([random.randrange(0, 256) for x in range(SRP_SALT_SIZE)])
