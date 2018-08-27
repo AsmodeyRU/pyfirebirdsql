@@ -164,15 +164,15 @@ def pad(n):
         return b''.join([chr(c) for c in s])
 
 
-def get_scramble(x, y):
-    return bytes2long(hash_digest(hashlib.sha1, pad(x), pad(y)))
+def get_scramble(x, y, hash_algo):
+    return bytes2long(hash_digest(hash_algo, pad(x), pad(y)))
 
 
-def getUserHash(salt, user, password):
+def getUserHash(salt, user, password, hash_algo):
     assert isinstance(user, bytes)
     assert isinstance(password, bytes)
-    hash1 = hash_digest(hashlib.sha1, user, b':', password)
-    hash2 = hash_digest(hashlib.sha1, salt, hash1)
+    hash1 = hash_digest(hash_algo, user, b':', password)
+    hash2 = hash_digest(hash_algo, salt, hash1)
     rc = bytes2long(hash2)
 
     return rc
@@ -219,7 +219,7 @@ def server_seed(v):
     return B, b
 
 
-def client_session(user, password, salt, A, B, a):
+def client_session(user, password, salt, A, B, a, hash_algo):
     """
     Client session secret
         Both:  u = H(A, B)
@@ -229,20 +229,20 @@ def client_session(user, password, salt, A, B, a):
         User:  K = H(S)
     """
     N, g, k = get_prime()
-    u = get_scramble(A, B)
-    x = getUserHash(salt, user, password)   # x
+    u = get_scramble(A, B, hash_algo)
+    x = getUserHash(salt, user, password, hash_algo)   # x
     gx = pow(g, x, N)                       # g^x
     kgx = (k * gx) % N                      # kg^x
     diff = (B - kgx) % N                    # B - kg^x
     ux = (u * x) % N
     aux = (a + ux) % N
     session_secret = pow(diff, aux, N)      # (B - kg^x) ^ (a + ux)
-    K = hash_digest(hashlib.sha1, session_secret)
+    K = hash_digest(hash_algo, session_secret)
 
     return K
 
 
-def server_session(user, password, salt, A, B, b):
+def server_session(user, password, salt, A, B, b, hash_algo):
     """
     Server session secret
         Both:  u = H(A, B)
@@ -251,12 +251,12 @@ def server_session(user, password, salt, A, B, b):
         Host:  K = H(S)
     """
     N, g, k = get_prime()
-    u = get_scramble(A, B)
-    v = get_verifier(user, password, salt)
+    u = get_scramble(A, B, hash_algo)
+    v = get_verifier(user, password, salt, hash_algo)
     vu = pow(v, u, N)                       # v^u
     Avu = (A * vu) % N                      # Av^u
     session_secret = pow(Avu, b, N)         # (Av^u) ^ b
-    K = hash_digest(hashlib.sha1, session_secret)
+    K = hash_digest(hash_algo, session_secret)
     if DEBUG_PRINT:
         print('server session_secret=', binascii.b2a_hex(long2bytes(session_secret)), end='\n')
         print('server session hash K=', binascii.b2a_hex(K))
@@ -264,18 +264,18 @@ def server_session(user, password, salt, A, B, b):
     return K
 
 
-def client_proof(user, password, salt, A, B, a):
+def client_proof(user, password, salt, A, B, a, hash_algo):
     """
     M = H(H(N) xor H(g), H(I), s, A, B, K)
     """
     N, g, k = get_prime()
-    K = client_session(user, password, salt, A, B, a)
+    K = client_session(user, password, salt, A, B, a, hash_algo)
 
-    n1 = bytes2long(hash_digest(hashlib.sha1, N))
-    n2 = bytes2long(hash_digest(hashlib.sha1, g))
+    n1 = bytes2long(hash_digest(hash_algo, N))
+    n2 = bytes2long(hash_digest(hash_algo, g))
     M = hash_digest(
-        hashlib.sha1,
-        pow(n1, n2, N), hash_digest(hashlib.sha1, user), salt, A, B, K
+        hash_algo,
+        pow(n1, n2, N), hash_digest(hash_algo, user), salt, A, B, K
     )
     if DEBUG_PRINT:
         print('client_proof:M=', binascii.b2a_hex(M), end='\n')
@@ -297,9 +297,9 @@ def get_salt():
     return salt
 
 
-def get_verifier(user, password, salt):
+def get_verifier(user, password, salt, hash_algo):
     N, g, k = get_prime()
-    x = getUserHash(salt, user, password)
+    x = getUserHash(salt, user, password, hash_algo)
     return pow(g, x, N)
 
 
@@ -311,19 +311,20 @@ if __name__ == '__main__':
     # Both
     user = b'SYSDBA'
     password = b'masterkey'
+    hash_algo = hashlib.sha256
 
     # Client send A to Server
     A, a = client_seed()
 
     # Server send B, salt to Client
     salt = get_salt()
-    v = get_verifier(user, password, salt)
+    v = get_verifier(user, password, salt, hash_algo)
     B, b = server_seed(v)
 
-    serverKey = server_session(user, password, salt, A, B, b)
+    serverKey = server_session(user, password, salt, A, B, b, hash_algo)
 
     # Client send M to Server
-    M, clientKey = client_proof(user, password, salt, A, B, a)
+    M, clientKey = client_proof(user, password, salt, A, B, a, hash_algo)
 
     # Client and Server has same key
     assert clientKey == serverKey
